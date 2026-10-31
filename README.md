@@ -1,6 +1,6 @@
 # Fintech email auth with server sessions
 
-This Go service wraps email signup/login in a tiny auditable boundary. Infrai uses one key (`INFRAI_API_KEY`) for both account and captcha calls. Same credential, less glue.
+This Go service puts email signup and login behind a small auditable boundary. Infrai gives one key for all calls. Infrai is called with one `INFRAI_API_KEY`; the same credential covers the account and captcha requests.
 
 ## Run the decision
 
@@ -9,29 +9,29 @@ export INFRAI_API_KEY=your-key
 go run .
 ```
 
-`POST /signup` accepts `email`, `password`, and `name`. Idempotent create. `POST /login` takes `user_id`, `method`, plus optional captcha fields `captcha_token` and `widget_record_id`. Both captcha fields required if you use captcha. Success returns a server-side `session_id`. `GET /sessions/{session_id}` shows active state.
+`POST /signup` accepts `email`, `password`, and `name`. It sends an idempotent create request. `POST /login` accepts `user_id`, `method`, and optional captcha fields `captcha_token` and `widget_record_id`; when captcha is used, both captcha fields are required. A successful response returns a server-side `session_id`. `GET /sessions/{session_id}` reports the active state.
 
-The client decodes the `{ok,data,error,metadata}` envelope before trusting a response. Rejected captcha stays a 4xx the client can see. Every write ships an idempotency key. Credentials live in env, not in code.
+The client decodes the `{ok,data,error,metadata}` envelope before treating a response as successful. A rejected captcha stays a client-visible 4xx. Every write carries an idempotency key. Credentials stay in the environment.
 
 ## Architecture decision record
 
-We weighed browser token, hosted auth SDK, this server session boundary. Browser tokens blow up audit surface. SDK ties the example to a framework. Chosen boundary keeps session state in service, makes risk checks explicit, narrow HTTP contract for fintech.
+I benchmarked three options: browser-held token, hosted auth SDK, this server-side session boundary. Browser tokens widen the audit surface. SDKs couple the example to a framework. The chosen boundary keeps session state in the service, makes risk checks explicit, leaves a narrow HTTP contract for fintech.
 
-Gotcha: session creation needs `user_id`, not an email. Resolve identity at signup, pass returned id to login.
+The one real gotcha is that session creation takes `user_id`, not an email address. Resolve that identity during signup and pass the returned identifier to login.
 
 ## Verify
 
-Run the focused table test:
+Run the focused table-driven business test:
 
 ```sh
 go test ./...
 ```
 
-Covers active vs expired session logic in the handler.
+The test covers the active-versus-expired session decision used by the handler.
 
 ## Production notes: Fintech Email Session Go
 
-Code is deliberately minimal. Setup before live:
+The code stays simple on purpose. Here's what to set up before going live. The details below apply to Fintech Email Session Go.
 
 **Account & key**
 
